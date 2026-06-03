@@ -244,20 +244,6 @@ const APTS=[
  conf:`Price MEDIUM (units shift); the 7/21·8/11·9/4 dates UNVERIFIED. ZIP 60654 (Zillow) vs 60661 (site).`,
  zillow:`https://www.zillow.com/apartments/chicago-il/alta/5XfX2z/`,
  sources:[{l:`Zillow`,u:`https://www.zillow.com/apartments/chicago-il/alta/5XfX2z/`},{l:`VeryApt 7.4/10`,u:`https://www.veryapt.com/ApartmentReview-a1000-alta-at-k-station-chicago`}]},
-{id:2,name:`The Parker Fulton Market`,addr:`730 W Couch Pl, Chicago, IL 60661 — Fulton Market`,area:`Fulton Market`,areaSort:`Fulton Market`,lat:41.8852,lng:-87.6471,
- rentText:`~$3,994 – $4,579`,rentShort:`$3,994+`,rentLow:3994,sqftText:`~1,013 – 1,079 sf`,sqftShort:`1,013–1,079`,sqftSort:1046,bedbath:`2 bd / 2 ba`,
- movein:`6/7, 8/15, 8/24, 9/7`,moveinNote:`your noted dates — couldn't unit‑verify`,
- walk:`~13 min walk · 0.59 mi`,walkMin:13,totalMin:43,totalText:`~43 min to Elmhurst`,
- laundry:`In‑unit W/D`,parking:`Onsite garage ~$250/mo + EV (Zillow "None" is wrong)`,parkShort:`$250`,parkingSort:250,
- gym:`Fitness + yoga; rooftop POOL, sun terrace, dog run`,
- pets:`2 dogs + 2 cats`,concession:`Up to 1 MONTH FREE on 2BR`,scores:`Walk 98 · Transit 97`,verdict:`1 month free on 2BR`,
- rating:`Mixed`,ratingSort:6.8,
- reviews:`Split sentiment. Residents love the location, cleanliness, spacious light‑filled units, rooftop pool and friendly staff, and call it quiet; complaints cluster on building‑systems upkeep — hot water/elevator outages, EV chargers down a year, front‑desk turnover, missing packages.`,
- pros:[`1 MONTH FREE on 2BR — real saver`,`Rooftop pool; reviewers say quiet & clean`,`In‑unit laundry; garage + EV`,`Prime Fulton Market block`],
- cons:[`Hot‑water / elevator outages reported`,`Front‑desk turnover; missing packages`,`Among the priciest`,`Dog‑run upkeep complaints`],
- conf:`Price MEDIUM; the four move‑in dates UNVERIFIED. Parking confirmed despite Zillow error.`,
- zillow:`https://www.zillow.com/apartments/chicago-il/the-parker-fulton-market/CkBdGP/`,
- sources:[{l:`Zillow`,u:`https://www.zillow.com/apartments/chicago-il/the-parker-fulton-market/CkBdGP/`},{l:`ApartmentRatings`,u:`https://www.apartmentratings.com/il/chicago/the-parker-fulton-market_9199332346275163110/`}]},
 {id:3,name:`Circa 922`,addr:`922 W Washington Blvd, Chicago, IL 60607 — West Loop`,area:`West Loop`,areaSort:`West Loop`,lat:41.8833,lng:-87.6506,
  rentText:`~$3,945 – $4,495`,rentShort:`$3,945+`,rentLow:3945,sqftText:`988 – 1,130 sf`,sqftShort:`988–1,130`,sqftSort:1059,bedbath:`2 bd / 2 ba`,
  movein:`6/6, 6/19, 8/11`,moveinNote:`verified live: #420 6/6, #509 6/19, #609 8/11`,
@@ -367,6 +353,7 @@ const $=s=>document.querySelector(s);
 function hasAlt(id){return !!(ALTS[id]&&ALTS[id].route);}
 function money(n){return `$${Math.round(n).toLocaleString()}`;}
 function setMapMeta(html){const el=$('#mapmeta');if(el)el.innerHTML=html;}
+function displayNum(a){return APTS.findIndex(x=>x.id===a.id)+1;}
 function renderSummary(){
  const cheapest=APTS.reduce((m,a)=>a.rentLow<m.rentLow?a:m,APTS[0]);
  const fastest=APTS.reduce((m,a)=>a.totalMin<m.totalMin?a:m,APTS[0]);
@@ -377,9 +364,10 @@ function renderSummary(){
   <div class="metric"><strong>${largest.sqftSort.toLocaleString()}</strong><span>most sqft</span></div>`;
 }
 function cardHtml(a){
+ const n=displayNum(a);
  return `<button class="apt-card" data-id="${a.id}">
   <div class="apt-top">
-    <span class="num">${a.id}</span>
+    <span class="num">${n}</span>
     <span class="apt-main"><span class="apt-name">${a.name}</span><span class="apt-area">${a.area}</span></span>
   </div>
   <div class="apt-meta">
@@ -402,8 +390,9 @@ function chip(t,c){return `<span class="chip ${c||''}">${t}</span>`;}
 function buildSide(a){
  const pool=/pool/i.test(a.gym), parkWarn=/verify|offsite|outdoor/i.test(a.parking), li=arr=>arr.map(t=>`<li>${t}</li>`).join('');
  const toggle=`<div class="rtoggle"><button class="rt" data-m="walk">Walking</button>${hasAlt(a.id)?`<button class="rt" data-m="transit">Bus / 'L'</button>`:`<button class="rt" disabled title="walking is fastest">Bus / 'L' n/a</button>`}</div>`;
+ const n=displayNum(a);
  return `
-  <div class="shead"><div class="sname">${a.id}. ${a.name}</div><div class="sarea">${a.area} · ${a.bedbath}</div><div class="verdict">${a.verdict}</div></div>
+  <div class="shead"><div class="sname">${n}. ${a.name}</div><div class="sarea">${a.area} · ${a.bedbath}</div><div class="verdict">${a.verdict}</div></div>
   <div class="sbody">
     <div class="tiles">
       <div class="tile"><div class="tn">${a.rentShort}</div><div class="tl">rent /mo</div></div>
@@ -454,7 +443,7 @@ function setMode(m){routeMode=m;if(activeId==null)return;const eff=(m==='transit
 function closeSide(){$('#side').classList.remove('open');clearRoute();document.querySelectorAll('#cmp tbody tr').forEach(tr=>tr.classList.remove('active'));highlightCard(null);activeId=null;activePlace=null;setMapMeta(`<b>${APTS.length} apartment finalists</b><br>Blue line = Metra UP-W. Dashed red = Elmhurst shuttle leg.`);}
 
 /* ---------- table ---------- */
-function rowHtml(a){return `<tr data-id="${a.id}"><td><b>${a.id}. ${a.name}</b><div class="mini">${a.area}</div></td><td>${a.rentShort}</td><td>${a.sqftShort}</td><td>${a.totalMin}m<div class="mini">${a.walkMin}m walk</div></td><td><span class="pill">${a.rating}</span></td></tr>`;}
+function rowHtml(a){return `<tr data-id="${a.id}"><td><b>${displayNum(a)}. ${a.name}</b><div class="mini">${a.area}</div></td><td>${a.rentShort}</td><td>${a.sqftShort}</td><td>${a.totalMin}m<div class="mini">${a.walkMin}m walk</div></td><td><span class="pill">${a.rating}</span></td></tr>`;}
 function renderTable(rows){$('#cmp tbody').innerHTML=rows.map(rowHtml).join('');document.querySelectorAll('#cmp tbody tr').forEach(tr=>{tr.onclick=()=>{const id=+tr.dataset.id;openSide(id);focusPin(id,false);};});}
 function highlightRow(id){document.querySelectorAll('#cmp tbody tr').forEach(tr=>tr.classList.toggle('active',+tr.dataset.id===id));}
 let sortDir={};
@@ -482,7 +471,7 @@ function showRoute(id,mode){
  shownRoute.eachLayer(layer=>layer.bringToFront&&layer.bringToFront());
  fitWalk(coords);
 }
-function popupHtml(a){return `<div class="lpop"><b>${a.id}. ${a.name}</b><div class="lcat">${a.area} · ${a.bedbath}</div><div class="laddr">${a.rentShort} · ${a.sqftShort} sf · ~${a.totalMin} min to Elmhurst</div><div class="lmeta">${a.laundry} · Parking ${a.parkShort}</div></div>`;}
+function popupHtml(a){return `<div class="lpop"><b>${displayNum(a)}. ${a.name}</b><div class="lcat">${a.area} · ${a.bedbath}</div><div class="laddr">${a.rentShort} · ${a.sqftShort} sf · ~${a.totalMin} min to Elmhurst</div><div class="lmeta">${a.laundry} · Parking ${a.parkShort}</div></div>`;}
 function lpop(g){return `<div class="lpop"><b>${g.n}</b><div class="lcat">${g.cat}</div><div class="laddr">${g.a}</div><div class="lmeta">${g.hours?`<b>Hours:</b> ${g.hours}`:''}${g.rating?` &nbsp;·&nbsp; <b>Rating:</b> ${g.rating}`:''}</div><div class="lnote">${g.note}</div></div>`;}
 function initMap(){
  const map=L.map('map',{scrollWheelZoom:true,zoomControl:true}).setView([41.886,-87.66],13);_map=map;
@@ -498,7 +487,7 @@ function initMap(){
  const grocLayer=L.layerGroup().addTo(map);GROCERY.forEach((g,i)=>L.marker([g.lat,g.lng],{icon:makePlaceIcon('grocery'),riseOnHover:true,title:g.n,keyboard:true,bubblingMouseEvents:false}).addTo(grocLayer).bindTooltip(`${g.n}<br><span style="font-size:11px;color:#6b7280">Click for hours + cost</span>`,{direction:'top',offset:[0,-14]}).on('click',e=>{if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);openPlace('grocery',i);}));
  const gymLayer=L.layerGroup().addTo(map);GYMS.forEach((g,i)=>L.marker([g.lat,g.lng],{icon:makePlaceIcon('gym'),riseOnHover:true,title:g.n,keyboard:true,bubblingMouseEvents:false}).addTo(gymLayer).bindTooltip(`${g.n}<br><span style="font-size:11px;color:#6b7280">Click for hours + cost</span>`,{direction:'top',offset:[0,-14]}).on('click',e=>{if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);openPlace('gym',i);}));
  const aptLayer=L.layerGroup().addTo(map);
- APTS.forEach(a=>{const m=L.marker([a.lat,a.lng],{icon:makePinIcon(a.id,'#24446f'),riseOnHover:true,bubblingMouseEvents:false}).addTo(aptLayer);m.bindPopup(popupHtml(a),{maxWidth:250});m.bindTooltip(`${a.id}. ${a.name}`,{direction:'top'});m.on('click',(e)=>{if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);openSide(a.id);});aptMarkers[a.id]=m;});
+ APTS.forEach(a=>{const m=L.marker([a.lat,a.lng],{icon:makePinIcon(displayNum(a),'#24446f'),riseOnHover:true,bubblingMouseEvents:false}).addTo(aptLayer);m.bindPopup(popupHtml(a),{maxWidth:250});m.bindTooltip(`${displayNum(a)}. ${a.name}`,{direction:'top'});m.on('click',(e)=>{if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);openSide(a.id);});aptMarkers[a.id]=m;});
  L.control.layers(null,{'Apartments':aptLayer,'Grocery':grocLayer,'Gyms':gymLayer,'Train + shuttle':trunk},{collapsed:false,position:'bottomleft'}).addTo(map);
  _ALL=L.latLngBounds([...APTS.map(a=>[a.lat,a.lng]),OGILVIE,ELMHURST,MCMASTER]);
  setTimeout(()=>{try{map.invalidateSize();zoomApts();}catch(e){console.warn(e);}},300);
