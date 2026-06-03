@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apartment Commute Map — Ethan</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  :root{--navy:#24446f;--ink:#18212f;--muted:#677282;--line:#dde4ed;--bg:#eef3f8;--green:#2d9363;--amber:#d98d2b;--red:#cf5348;--chip:#edf3f7;--teal:#0b7d78;--white:#fff;--shadow:0 18px 45px rgba(30,45,70,.18);}
+  *{box-sizing:border-box}
+  html,body{height:100%;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink);background:var(--bg);overflow:hidden;}
+  button,select{font:inherit}
+  button{cursor:pointer}
+  .app{height:100vh;display:grid;grid-template-columns:370px minmax(0,1fr);background:#dce7ef;}
+  .app.rail-hidden{grid-template-columns:minmax(0,1fr);}
+  .rail{position:relative;z-index:900;background:rgba(255,255,255,.96);backdrop-filter:saturate(1.2) blur(12px);border-right:1px solid rgba(158,171,188,.5);box-shadow:8px 0 28px rgba(35,52,76,.12);display:flex;flex-direction:column;min-width:0;}
+  .rail.collapsed{display:none;}
+  .brand{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:18px 18px 12px;}
+  .eyebrow{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--teal);font-weight:750;}
+  h1{margin:0;font-size:22px;line-height:1.06;color:var(--ink);letter-spacing:0;}
+  .rail-sub{margin:8px 18px 0;color:var(--muted);font-size:12.5px;line-height:1.45;}
+  .iconbtn,.rail-open{width:34px;height:34px;display:inline-grid;place-items:center;border:1px solid var(--line);border-radius:10px;background:#fff;color:#31445d;box-shadow:0 3px 12px rgba(45,62,83,.08);}
+  .iconbtn:hover,.rail-open:hover,.ghostbtn:hover{border-color:#bac8d6;background:#f8fbfd;}
+  .summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:14px 18px 12px;}
+  .metric{background:#f5f8fb;border:1px solid #e2e9f0;border-radius:8px;padding:10px 9px;}
+  .metric strong{display:block;font-size:16px;line-height:1;color:var(--navy);}
+  .metric span{display:block;margin-top:5px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.055em;}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 18px 12px;}
+  .actions .wide{grid-column:1/-1;}
+  .ghostbtn{height:36px;border:1px solid var(--line);border-radius:8px;background:#fff;color:#26384f;font-weight:650;font-size:12.5px;}
+  .sharebtn{height:38px;border:1px solid #bddbd8;border-radius:8px;background:#edf8f7;color:#0b6864;font-weight:760;font-size:12.5px;}
+  .sharebtn:hover{background:#e3f3f1;border-color:#91c8c2;}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;padding:0 18px 12px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;background:#f6f8fb;border:1px solid #e3eaf1;border-radius:999px;padding:5px 9px;color:#425165;font-size:11.5px;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;border:1.5px solid #fff;box-shadow:0 0 0 1px #aeb9c7;}
+  .section-title{padding:8px 18px 7px;color:#445266;font-size:11px;text-transform:uppercase;letter-spacing:.07em;font-weight:800;border-top:1px solid #edf1f5;}
+  .apt-list{padding:0 10px 10px 12px;overflow:auto;min-height:0;}
+  .apt-card{width:100%;text-align:left;border:1px solid transparent;background:#fff;border-radius:8px;padding:11px 12px;margin:0 0 8px;box-shadow:0 2px 12px rgba(34,52,75,.07);color:var(--ink);}
+  .apt-card:hover{border-color:#bfd0df;box-shadow:0 6px 20px rgba(34,52,75,.12);transform:translateY(-1px);}
+  .apt-card.active{border-color:var(--teal);box-shadow:0 0 0 2px rgba(11,125,120,.12),0 8px 24px rgba(34,52,75,.13);}
+  .apt-top{display:flex;align-items:flex-start;gap:10px;}
+  .num{flex:0 0 26px;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--navy);color:#fff;font-weight:800;font-size:12px;}
+  .apt-main{min-width:0;flex:1;}
+  .apt-name{display:block;font-weight:780;font-size:14px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;}
+  .apt-area{display:block;font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.32;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .apt-meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px;}
+  .apt-meta div{background:#f5f8fb;border-radius:7px;padding:6px 7px;min-width:0;}
+  .apt-meta b{display:block;font-size:12px;color:#21324a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .apt-meta span{display:block;margin-top:2px;font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .method{margin:0 18px 16px;border-top:1px solid #edf1f5;padding-top:10px;color:var(--muted);font-size:11.5px;line-height:1.45;}
+  .method summary{cursor:pointer;color:#425165;font-weight:700;}
+  .method p{margin:8px 0 0;}
+  .maparea{position:relative;min-width:0;height:100vh;overflow:hidden;background:#dce7ef;}
+  #map{width:100%;height:100%;background:#e7eef4;}
+  .maperr{padding:40px;text-align:center;color:var(--muted);font-size:14px;}
+  .rail-open{position:absolute;left:16px;top:16px;z-index:1000;display:none;background:#fff;}
+  .map-top{position:absolute;left:18px;right:18px;top:16px;z-index:800;display:flex;justify-content:center;pointer-events:none;}
+  .routebar{display:flex;align-items:center;gap:8px;max-width:760px;background:rgba(255,255,255,.94);border:1px solid rgba(195,207,220,.75);border-radius:999px;box-shadow:var(--shadow);padding:8px 12px;pointer-events:auto;color:#35465c;font-size:12.5px;}
+  .routebar b{color:var(--navy);}
+  .routebar .line{width:34px;height:2px;border-top:3px solid #2b7de0;border-radius:999px;opacity:.85;}
+  .routebar .dash{width:22px;height:2px;border-top:3px dashed #c44d44;border-radius:999px;opacity:.8;}
+  .mapmeta{position:absolute;left:18px;bottom:18px;z-index:800;background:rgba(255,255,255,.95);border:1px solid rgba(195,207,220,.75);border-radius:10px;box-shadow:0 10px 28px rgba(30,45,70,.15);padding:10px 12px;color:#35465c;font-size:12px;max-width:360px;}
+  .mapmeta b{color:var(--navy);}
+  .share-overlay{position:absolute;inset:0;z-index:1500;display:none;align-items:center;justify-content:center;background:rgba(22,32,46,.30);padding:18px;}
+  .share-overlay.open{display:flex;}
+  .share-card{width:420px;max-width:100%;background:#fff;border:1px solid #dbe5ee;border-radius:14px;box-shadow:0 24px 70px rgba(15,25,50,.32);padding:18px;}
+  .share-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;}
+  .share-title{font-size:19px;font-weight:820;color:#18212f;line-height:1.15;}
+  .share-copy{font-size:12.8px;line-height:1.5;color:#526174;margin:8px 0 14px;}
+  .share-actions{display:grid;gap:8px;}
+  .share-actions button,.share-actions a{height:40px;display:grid;place-items:center;text-align:center;text-decoration:none;border-radius:8px;border:1px solid var(--line);background:#fff;color:#26384f;font-size:13px;font-weight:720;}
+  .share-actions .primary{background:var(--navy);border-color:var(--navy);color:#fff;}
+  .share-status{min-height:18px;margin-top:10px;color:#0b6864;font-size:12px;font-weight:650;}
+  /* slide-in side panel */
+  #side{position:absolute;top:16px;right:16px;bottom:16px;width:430px;max-width:calc(100% - 32px);background:#fff;border-radius:14px;box-shadow:0 18px 60px rgba(15,25,50,.30);transform:translateX(calc(100% + 30px));transition:transform .28s cubic-bezier(.4,0,.2,1);overflow:hidden auto;z-index:1200;border:1px solid rgba(203,214,226,.9);}
+  #side.open{transform:none;}
+  .closebtn{position:sticky;top:0;float:right;margin:10px 12px 0 0;width:32px;height:32px;border-radius:10px;border:1px solid #e1e8ef;background:#fff;color:#445;font-size:16px;line-height:1;cursor:pointer;z-index:3;box-shadow:0 3px 12px rgba(45,62,83,.08);}
+  .closebtn:hover{background:#e0e6f0;}
+  .shead{padding:20px 20px 15px;border-top:5px solid var(--navy);background:linear-gradient(135deg,#f9fbfd 0%,#fff 58%,#eff7f5 100%);}
+  .sname{font-size:22px;font-weight:820;color:#18212f;line-height:1.1;padding-right:36px;letter-spacing:0;}
+  .sarea{font-size:12px;color:var(--muted);margin-top:5px;}
+  .verdict{display:inline-block;margin-top:11px;background:#eaf4f3;color:#0b6864;border:1px solid #cde5e3;border-radius:20px;padding:4px 11px;font-size:11.5px;font-weight:750;}
+  .sbody{padding:5px 20px 22px;}
+  .place-body{padding-top:10px;}
+  .tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin:14px 0 6px;}
+  .tile{background:#f4f8fb;border:1px solid #e2eaf1;border-radius:8px;padding:12px 8px;text-align:center;}
+  .tile .tn{font-size:17px;font-weight:820;color:var(--navy);letter-spacing:0;}
+  .tile .tl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
+  .atline{font-size:12px;color:#4a5568;margin:8px 2px 2px;line-height:1.5;}
+  .commstrip{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#f3f8ff;border:1px solid #dfeaf8;border-radius:9px;padding:10px 12px;margin:12px 0 8px;font-size:12.5px;color:#2b3a55;}
+  .commstrip b{color:var(--navy);} .commstrip .arrow{color:#9fb0cf;font-weight:700;}
+  .rtoggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin:2px 0 4px;}
+  .rt{border:0;border-radius:0;padding:6px 13px;font-size:12px;background:#fff;color:#445;cursor:pointer;}
+  .rt+.rt{border-left:1px solid var(--line);}
+  .rt.active{background:var(--navy);color:#fff;font-weight:600;}
+  .rt[disabled]{color:#aab2c0;cursor:default;background:#f7f8fb;}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0;}
+  .chip{font-size:11.5px;padding:5px 10px;border-radius:20px;background:#edf7f1;color:#236c41;border:1px solid #cfe7d8;font-weight:650;}
+  .chip.warn{background:#fdf0e7;color:#9a5212;border-color:#f3d7bf;}
+  .chip.soft{background:#eef2f8;color:#445;border-color:#dde3ee;}
+  section.s{margin:14px 0;}
+  section.s h5{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--navy);}
+  section.s p{margin:0;font-size:12.8px;line-height:1.55;color:#39424f;}
+  .stars{letter-spacing:1px;} .star{color:#dfe3ea;font-size:14px;} .star.on{color:#f2b01e;}
+  .ratenum{font-size:12px;color:var(--muted);margin-left:5px;font-weight:600;}
+  .pc2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  ul.pc{margin:4px 0 0;padding-left:0;list-style:none;}
+  ul.pc li{font-size:12.3px;line-height:1.4;margin:5px 0;padding-left:17px;position:relative;}
+  ul.pros li:before{content:"✓";color:var(--green);font-weight:800;position:absolute;left:0;}
+  ul.cons li:before{content:"✕";color:var(--red);font-weight:800;position:absolute;left:0;}
+  details.conf{margin:14px 0 6px;background:#fff8f7;border:1px solid #f3d7d4;border-radius:8px;padding:9px 12px;}
+  details.conf summary{font-size:12px;font-weight:600;color:#9a4038;cursor:pointer;}
+  details.conf p{margin:7px 0 0;font-size:11.7px;line-height:1.5;color:#7a4640;}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;}
+  .btn{font-size:12.5px;text-decoration:none;padding:8px 13px;border-radius:8px;border:1px solid var(--line);color:var(--navy);background:#fff;}
+  .btn.primary{background:var(--navy);color:#fff;border-color:var(--navy);font-weight:600;}
+  .place-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:6px 0 12px;}
+  .place-card{background:#f6f9fb;border:1px solid #e3ebf2;border-radius:8px;padding:10px 11px;min-width:0;}
+  .place-card b{display:block;font-size:12.5px;color:#24364f;margin-bottom:4px;}
+  .place-card span{display:block;color:#596679;font-size:12px;line-height:1.35;}
+  .offer-list{display:grid;gap:6px;margin:7px 0 0;padding:0;list-style:none;}
+  .offer-list li{font-size:12.4px;line-height:1.35;color:#394657;background:#f8fafc;border-left:3px solid #dbe7f2;border-radius:7px;padding:7px 9px;}
+  .fit-note{font-size:12.5px;line-height:1.45;color:#405066;background:#f6fbf8;border:1px solid #dfeee5;border-radius:8px;padding:9px 11px;}
+  .watch-note{font-size:12.3px;line-height:1.45;color:#77502c;background:#fff8ed;border:1px solid #f0dec6;border-radius:8px;padding:9px 11px;}
+  .place-summary{display:grid;gap:7px;margin:12px 0;}
+  .place-row{display:grid;grid-template-columns:82px 1fr;gap:10px;align-items:start;padding:8px 0;border-bottom:1px solid #edf2f6;font-size:12.5px;line-height:1.35;}
+  .place-row:last-child{border-bottom:0;}
+  .place-row b{color:#26384f;font-size:11px;text-transform:uppercase;letter-spacing:.055em;}
+  .place-row span{color:#465366;}
+  .compare{border-top:1px solid #edf1f5;margin:0 12px 14px;padding-top:8px;}
+  .compare summary{cursor:pointer;color:#425165;font-size:12px;font-weight:760;padding:8px 6px;}
+  table{width:100%;border-collapse:collapse;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden;font-size:11.5px;margin-top:6px;}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:#2f506f;color:#fff;font-weight:650;cursor:pointer;white-space:nowrap;font-size:10px;text-transform:uppercase;letter-spacing:.03em;}
+  th:hover{background:#264a82;}
+  tbody tr{cursor:pointer;} tbody tr:hover{background:#f0f4fb;} tbody tr.active{background:#e4ecfa;}
+  td .mini{color:var(--muted);font-size:11px;}
+  .pill{display:inline-block;background:var(--chip);border-radius:20px;padding:1px 8px;font-size:11px;color:#33405a;}
+  .leaflet-popup-content{margin:0;font-size:13px;}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{box-shadow:0 6px 22px rgba(20,30,60,.22);}
+  .pinico{background:transparent;border:0;} .pinico svg{filter:drop-shadow(0 2px 3px rgba(15,25,50,.35));}
+  .placeico{background:transparent;border:0;}
+  .placeico .place-pin{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:15px;font-weight:850;border:3px solid #fff;box-shadow:0 3px 10px rgba(20,35,55,.30);}
+  .placeico.gym .place-pin{background:#e08a25;}
+  .placeico.grocery .place-pin{background:#2e9e5b;}
+  .lpop{min-width:190px;padding:10px 12px;} .lpop b{font-size:13.5px;color:var(--navy);}
+  .lpop .lcat{display:inline-block;background:var(--chip);color:#33405a;border-radius:20px;padding:1px 8px;font-size:10.5px;margin:4px 0 6px;}
+  .lpop .laddr{font-size:12px;color:#39424f;} .lpop .lmeta{font-size:11.5px;color:#5b6573;margin-top:3px;} .lpop .lnote{font-size:11.8px;color:#39424f;margin-top:5px;line-height:1.45;}
+  .leaflet-control-layers{border:1px solid rgba(195,207,220,.85)!important;border-radius:10px!important;box-shadow:0 10px 28px rgba(30,45,70,.13)!important;}
+  .leaflet-control-zoom a{border-radius:8px!important;color:#2f4055!important;}
+  @media(max-width:980px){.app{grid-template-columns:1fr}.rail{position:absolute;left:12px;top:12px;bottom:12px;width:350px;max-width:calc(100% - 24px);border-radius:14px;border:1px solid rgba(158,171,188,.55);overflow:hidden}.rail-open{display:grid}.map-top{left:64px;right:12px}.routebar{font-size:11.5px}.routebar .line{width:22px}.mapmeta{left:12px;right:12px;bottom:12px;max-width:none}}
+  @media(max-width:680px){body{overflow:hidden}.rail{width:auto;right:12px;height:56vh;top:auto}.summary{grid-template-columns:1fr 1fr 1fr}.apt-meta{grid-template-columns:1fr 1fr 1fr}#side{left:10px;right:10px;width:auto;top:auto;height:70%;bottom:10px;border-radius:16px}.map-top{display:none}.mapmeta{font-size:11.5px}.tiles{grid-template-columns:1fr 1fr 1fr}.pc2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="rail" class="rail">
+    <div class="brand">
+      <div>
+        <p class="eyebrow">Fulton / West Loop</p>
+        <h1>Apartment Commute Map</h1>
+      </div>
+      <button id="railtoggle" class="iconbtn" title="Hide shortlist" aria-label="Hide shortlist">‹</button>
+    </div>
+    <p class="rail-sub">UP-W to Elmhurst, then private shuttle to McMaster-Carr.</p>
+    <div id="summary" class="summary"></div>
+    <div class="actions">
+      <button id="fitall" class="ghostbtn">Full Commute</button>
+      <button id="zoomapts" class="ghostbtn">Shortlist</button>
+      <button id="sharemap" class="sharebtn wide">Share With Friends</button>
+    </div>
+    <div class="legend" aria-label="Map legend">
+      <span><i class="dot" style="background:#24446f"></i>Apartment</span>
+      <span><i class="dot" style="background:#7b53b8"></i>Ogilvie</span>
+      <span><i class="dot" style="background:#2b7de0"></i>Elmhurst</span>
+      <span><i class="dot" style="background:#c0392b"></i>Work</span>
+      <span><i class="dot" style="background:#e08a25"></i>Gym</span>
+      <span><i class="dot" style="background:#2e9e5b"></i>Grocery</span>
+    </div>
+    <div class="section-title">Shortlist</div>
+    <div id="apartmentList" class="apt-list"></div>
+    <details class="compare">
+      <summary>Comparison Table</summary>
+      <table id="cmp">
+        <thead><tr>
+          <th data-k="name">Building</th><th data-k="rentLow">Rent</th><th data-k="sqftSort">Sqft</th>
+          <th data-k="totalMin">Elmhurst</th><th data-k="ratingSort">Reviews</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </details>
+    <details class="method">
+      <summary>Method & Confidence</summary>
+      <p>Walking routes use street-following OSRM foot paths; 212 W Washington is hand-corrected after the router snapped to a garage driveway. Train leg is Metra UP-W Ogilvie to Elmhurst, typically about 30 minutes. Prices, sqft, dates, and reviews should be re-confirmed before signing.</p>
+    </details>
+  </aside>
+  <main class="maparea">
+    <button id="railopen" class="rail-open" title="Show shortlist" aria-label="Show shortlist">☰</button>
+    <div id="map"></div>
+    <div class="map-top">
+      <div class="routebar">
+        <b>Ogilvie</b><span class="line"></span><span>UP-W</span><span class="line"></span><b>Elmhurst</b><span class="dash"></span><span>Shuttle</span><b>McMaster-Carr</b>
+      </div>
+    </div>
+    <div id="mapmeta" class="mapmeta"></div>
+    <div id="side"><button class="closebtn" onclick="closeSide()" aria-label="Close details">×</button><div id="sidecontent"></div></div>
+    <div id="shareoverlay" class="share-overlay" aria-hidden="true">
+      <div class="share-card" role="dialog" aria-modal="true" aria-labelledby="sharetitle">
+        <div class="share-head">
+          <div>
+            <div id="sharetitle" class="share-title">Share This Map</div>
+            <p class="share-copy">Send friends a single HTML file. They can double-click it in a browser; internet is only needed for the map tiles and source links.</p>
+          </div>
+          <button id="closeshare" class="iconbtn" aria-label="Close share menu">×</button>
+        </div>
+        <div class="share-actions">
+          <button id="downloadshare" class="primary">Download HTML Copy</button>
+          <button id="copyshare">Copy Sendable Message</button>
+          <button id="copyfiletip">Copy File Name</button>
+        </div>
+        <div id="sharestatus" class="share-status"></div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const OGILVIE=[41.8826,-87.6395], ELMHURST=[41.8997,-87.9407], MCMASTER=[41.9099,-87.9540];
+const TRAIN=[[41.8826,-87.6395],[41.8869,-87.6700],[41.8881,-87.7150],[41.8884,-87.7600],[41.8905,-87.8120],[41.8935,-87.8620],[41.8972,-87.9120],[41.8997,-87.9407]];
+
+const APTS=[
+{id:1,name:`Alta`,addr:`555 W Kinzie St, Chicago, IL 60654 — Fulton River District`,area:`Fulton River District`,areaSort:`Fulton River`,lat:41.8887,lng:-87.6418,
+ rentText:`~$3,837 – $4,779`,rentShort:`$3,837+`,rentLow:3837,sqftText:`~1,110 – 1,400 sf`,sqftShort:`1,110–1,400`,sqftSort:1255,bedbath:`2 bd / 2 ba`,
+ movein:`7/21, 8/11, 9/4`,moveinNote:`your noted dates — couldn't unit‑verify`,
+ walk:`~10 min walk · 0.47 mi (street route)`,walkMin:10,totalMin:40,totalText:`~40 min to Elmhurst`,
+ laundry:`In‑unit W/D`,parking:`Onsite garage ~$235 unreserved / $295 reserved`,parkShort:`$235+`,parkingSort:235,
+ gym:`Fitness center + classes; Olympic pool, spa, sauna, indoor sports court, sun terrace`,
+ pets:`Dogs/cats, 2 max`,concession:`—`,scores:`Walk 94 · Transit 100`,verdict:`Most space + Transit Score 100`,
+ rating:`Mixed`,ratingSort:6.5,
+ reviews:`Polarized. Praised for location, transit, clean modern units and excellent front‑desk staff; recurring gripes are frustrating corporate management, a long amenity/gym renovation, and train/factory noise (windows aren't soundproof).`,
+ pros:[`Top transit access; ~10 min walk to Ogilvie`,`Large 2BRs (up to 1,400 sf)`,`Olympic pool, sports court, sauna`,`In‑unit laundry; parking ~$235`],
+ cons:[`Train/factory NOISE reported`,`Corporate management frustrating`,`Long amenity/gym renovation`,`Pricier tier`],
+ conf:`Price MEDIUM (units shift); the 7/21·8/11·9/4 dates UNVERIFIED. ZIP 60654 (Zillow) vs 60661 (site).`,
+ zillow:`https://www.zillow.com/apartments/chicago-il/alta/5XfX2z/`,
+ sources:[{l:`Zillow`,u:`https://www.zillow.com/apartments/chicago-il/alta/5XfX2z/`},{l:`VeryApt 7.4/10`,u:`https://www.veryapt.com/ApartmentReview-a1000-alta-at-k-station-chicago`}]},
+{id:2,name:`The Parker Fulton Market`,addr:`730 W Couch Pl, Chicago, IL 60661 — Fulton Market`,area:`Fulton Market`,areaSort:`Fulton Market`,lat:41.8852,lng:-87.6471,
+ rentText:`~$3,994 – $4,579`,rentShort:`$3,994+`,rentLow:3994,sqftText:`~1,013 – 1,079 sf`,sqftShort:`1,013–1,079`,sqftSort:1046,bedbath:`2 bd / 2 ba`,
+ movein:`6/7, 8/15, 8/24, 9/7`,moveinNote:`your noted dates — couldn't unit‑verify`,
+ walk:`~13 min walk · 0.59 mi`,walkMin:13,totalMin:43,totalText:`~43 min to Elmhurst`,
+ laundry:`In‑unit W/D`,parking:`Onsite garage ~$250/mo + EV (Zillow "None" is wrong)`,parkShort:`$250`,parkingSort:250,
+ gym:`Fitness + yoga; rooftop POOL, sun terrace, dog run`,
+ pets:`2 dogs + 2 cats`,concession:`Up to 1 MONTH FREE on 2BR`,scores:`Walk 98 · Transit 97`,verdict:`1 month free on 2BR`,
+ rating:`Mixed`,ratingSort:6.8,
+ reviews:`Split sentiment. Residents love the location, cleanliness, spacious light‑filled units, rooftop pool and friendly staff, and call it quiet; complaints cluster on building‑systems upkeep — hot water/elevator outages, EV chargers down a year, front‑desk turnover, missing packages.`,
+ pros:[`1 MONTH FREE on 2BR — real saver`,`Rooftop pool; reviewers say quiet & clean`,`In‑unit laundry; garage + EV`,`Prime Fulton Market block`],
+ cons:[`Hot‑water / elevator outages reported`,`Front‑desk turnover; missing packages`,`Among the priciest`,`Dog‑run upkeep complaints`],
+ conf:`Price MEDIUM; the four move‑in dates UNVERIFIED. Parking confirmed despite Zillow error.`,
+ zillow:`https://www.zillow.com/apartments/chicago-il/the-parker-fulton-market/CkBdGP/`,
+ sources:[{l:`Zillow`,u:`https://www.zillow.com/apartments/chicago-il/the-parker-fulton-market/CkBdGP/`},{l:`ApartmentRatings`,u:`https://www.apartmentratings.com/il/chicago/the-parker-fulton-market_9199332346275163110/`}]},
+{id:3,name:`Circa 922`,addr:`922 W Washington Blvd, Chicago, IL 60607 — West Loop`,area:`West Loop`,areaSort:`West Loop`,lat:41.8833,lng:-87.6506,
+ rentText:`~$3,945 – $4,495`,rentShort:`$3,945+`,rentLow:3945,sqftText:`988 – 1,130 sf`,sqftShort:`988–1,130`,sqftSort:1059,bedbath:`2 bd / 2 ba`,
+ movein:`6/6, 6/19, 8/11`,moveinNote:`verified live: #420 6/6, #509 6/19, #609 8/11`,
+ walk:`~13 min walk · 0.61 mi`,walkMin:13,totalMin:43,totalText:`~43 min to Elmhurst`,
+ laundry:`In‑unit W/D`,parking:`Heated gated garage $300/mo ($350 EV)`,parkShort:`$300`,parkingSort:300,
+ gym:`24/7 fitness w/ Peloton; rooftop POOL, lounge, firepit, pet spa/dog run`,
+ pets:`No breed limits`,concession:`None advertised — ask`,scores:`Walk 98 · Transit 91`,verdict:`Cleanest reviews (4.5★)`,
+ rating:`4.5★ (Birdeye)`,ratingSort:8.0,
+ reviews:`Mostly positive (Birdeye 4.5/5, ~123). Consistent praise for the West Loop location, responsive staff and "spotless" clean common areas; main gripes are early‑morning garbage‑truck noise and expensive parking, plus a tiny‑sample 1/5 grounds/maintenance outlier worth probing on a tour.`,
+ pros:[`June–Aug availability matching your dates`,`Highest clean/positive score here (4.5★)`,`24/7 Peloton gym + rooftop pool`,`Good 2BR space (≤1,130 sf)`],
+ cons:[`Expensive parking ($300 / $350 EV)`,`Early garbage‑truck noise noted`,`No current move‑in special`,`~13 min to Ogilvie`],
+ conf:`HIGH on facts; live base rents run ~$100 under the figures you noted (base vs. total‑with‑fees).`,
+ zillow:`https://www.zillow.com/apartments/chicago-il/circa-922/63D84S/`,
+ sources:[{l:`Zillow`,u:`https://www.zillow.com/apartments/chicago-il/circa-922/63D84S/`},{l:`Birdeye 4.5★`,u:`https://reviews.birdeye.com/circa-922-156723462513165`}]},
+{id:4,name:`Onni Fulton Market`,addr:`355 N Halsted St, Chicago, IL 60661 — Fulton Market east edge`,area:`Fulton Market`,areaSort:`Fulton Market`,lat:41.8882,lng:-87.6475,
+ rentText:`~$3,540 – $4,100 (small 2BRs); larger ~$5,100+`,rentShort:`$3,540+`,rentLow:3540,sqftText:`666 – 737 sf (Junior 2BR)`,sqftShort:`666–737`,sqftSort:700,bedbath:`2 bd / 2 ba`,
+ movein:`7/7 (your 7/1 not currently listed)`,moveinNote:`unit 1302, 666 sf, $3,570, 7/7`,
+ walk:`~16 min walk · 0.74 mi`,walkMin:16,totalMin:46,totalText:`~46 min to Elmhurst`,
+ laundry:`In‑unit W/D`,parking:`Onsite ~$225/mo (appears to be an OUTDOOR lot)`,parkShort:`$225`,parkingSort:225,
+ gym:`Fitness + yoga + Tonal; outdoor POOL, hot tubs, sauna, sundeck`,
+ pets:`No restrictions`,concession:`None ($500 admin)`,scores:`Walk 97 · Transit 93`,verdict:`Cheapest, but small + safety flag`,
+ rating:`Thin (new)`,ratingSort:5.5,
+ reviews:`New building with few reviews. Praise for resort‑style amenities, views and helpful staff; the serious flag is safety — a resident reported ~5 car break‑ins in the parking lot over 6 months with management offering "zero solutions."`,
+ pros:[`Newest building (2023); outdoor pool`,`Cheapest 2BR entry ($3,540–$4,100)`,`July move‑in (7/7); in‑unit W/D`,`24/7 cleaning staff`],
+ cons:[`Affordable 2BRs are SMALL (666–737 sf)`,`Reported parking‑LOT car break‑ins`,`Farther to Ogilvie (~16 min)`,`Larger 2BRs jump to ~$5,100+`],
+ conf:`Facts HIGH; prices MEDIUM (shift by lease term); reviews thin; 7/1 date not currently listed.`,
+ zillow:`https://www.zillow.com/apartments/chicago-il/onni-fulton-market/Cghmwq/`,
+ sources:[{l:`Zillow`,u:`https://www.zillow.com/apartments/chicago-il/onni-fulton-market/Cghmwq/`},{l:`Apartments.com`,u:`https://www.apartments.com/onni-fulton-market-chicago-il/by0mn79/`}]},
+{id:5,name:`212 W Washington #1703`,addr:`212 W Washington St, Chicago, IL 60606 — the Loop`,area:`The Loop`,areaSort:`The Loop`,lat:41.8836,lng:-87.6345,
+ rentText:`$3,675 (was $4,000) — utilities + cable + internet included`,rentShort:`$3,675`,rentLow:3675,sqftText:`1,100 sf`,sqftShort:`1,100`,sqftSort:1100,bedbath:`2 bd / 2 ba`,
+ movein:`~June 9 (available now)`,moveinNote:`single private condo unit — can change/expire`,
+ walk:`~7 min walk · ~0.35 mi`,walkMin:7,totalMin:37,totalText:`~37 min to Elmhurst — BEST`,
+ laundry:`In‑unit W/D (new 2024)`,parking:`Attached garage — listing CONFLICTS ("$200/mo" vs "included") — verify`,parkShort:`verify`,parkingSort:200,
+ gym:`Fitness center; 6th‑floor rooftop terrace, doorman, bike room, dog run`,
+ pets:`Cats/dogs OK`,concession:`Rent includes ALL utilities/cable/internet except electricity`,scores:`Steps from CTA + Metra`,verdict:`Best commute + utilities included`,
+ rating:`4.3★ (Google, 13)`,ratingSort:7.5,
+ reviews:`Building reviews are consistently positive (Google 4.3, small sample). Residents call it well‑run "like a well‑oiled machine," with responsive management, good security/door staff, clean common areas and a central‑but‑quiet Loop location; no notable cleanliness/noise complaints surfaced.`,
+ pros:[`BEST commute — ~7 min walk to Ogilvie`,`$3,675 INCLUDES utilities + cable + internet`,`1,100 sf, new 2024 W/D & baths`,`Well‑run, clean, quiet (4.3★)`],
+ cons:[`Single private condo — may re‑price/expire`,`Parking inclusion contradictory — verify`,`Loop, not Fulton Market scene`,`Smaller amenity set than towers`],
+ conf:`Rent DROPPED to $3,675 (your $4,000 is stale). Parking inclusion UNCONFIRMED. Private‑listing volatility.`,
+ zillow:`https://www.zillow.com/homedetails/212-W-Washington-St-APT-1703-Chicago-IL-60606/2101275041_zpid/`,
+ sources:[{l:`Zillow`,u:`https://www.zillow.com/homedetails/212-W-Washington-St-APT-1703-Chicago-IL-60606/2101275041_zpid/`},{l:`Google 4.3★`,u:`https://reviews.birdeye.com/212-w-washington-condo-association-170690270416572`}]},
+{id:6,name:`Parq Fulton`,addr:`1400 W Randolph St, Chicago, IL 60607 — Fulton Market (Union Park)`,area:`Fulton Market`,areaSort:`Fulton Market`,lat:41.8845,lng:-87.6627,
+ rentText:`~$4,462+ (earlier $3,500 was stale)`,rentShort:`$4,462+`,rentLow:4462,sqftText:`up to ~1,279 sf`,sqftShort:`≤1,279`,sqftSort:1150,bedbath:`2 bd / 2 ba`,
+ movein:`Ask leasing`,moveinNote:`specific 2BR units/dates not extractable`,
+ walk:`~28 min walk · 1.32 mi (or CTA Green/Pink)`,walkMin:28,totalMin:58,totalText:`~58 min to Elmhurst — farthest`,
+ laundry:`In‑unit W/D`,parking:`Onsite garage ~$250/mo (verify)`,parkShort:`$250`,parkingSort:250,
+ gym:`Technogym fitness + yoga; rooftop POOL + cabanas, dog park, co‑working, meditation room`,
+ pets:`2 dogs + 2 cats`,concession:`Up to 2 weeks free`,scores:`Walk 96 · Transit 77`,verdict:`Priciest + farthest from train`,
+ rating:`Polarized`,ratingSort:5.5,
+ reviews:`Sparse and sharply split. A few residents rave (9.7/10, n=3) it's quiet, clean, well‑run with great amenities and "could never afford it if not splitting rent"; others give ~1/5, citing rude/unresponsive management, slow maintenance, noise, cheap finishes, and a ~$700 move‑out carpet charge.`,
+ pros:[`Best amenity package (rooftop pool, Technogym, co‑working)`,`Up to 2 weeks free`,`Newer build (2022)`,`Spacious top‑end units (≤1,279 sf)`],
+ cons:[`PRICIEST — ~$4,462+`,`FARTHEST from Ogilvie (1.3 mi walk)`,`Management & move‑out‑fee complaints`,`Lower transit score (77)`],
+ conf:`Price corrected UP to ~$4,462+; 2BR units/dates and parking cost UNVERIFIED. Reviews thin/contradictory.`,
+ zillow:`https://www.zillow.com/b/parq-fulton-chicago-il-Chg43z/`,
+ sources:[{l:`Zillow`,u:`https://www.zillow.com/b/parq-fulton-chicago-il-Chg43z/`},{l:`VeryApt 9.7/10`,u:`https://www.veryapt.com/ApartmentReview-a29491-parq-fulton-apartments-chicago`}]}
+];
+
+const GROCERY=[
+ {n:`Whole Foods Market`,a:`1 N Halsted St`,lat:41.8822,lng:-87.6469,cat:`Organic supermarket`,hours:`Daily 8am–10pm`,rating:`~4.2`,cost:`$$$ · premium groceries; Prime deals help`,best:`Best for high-quality produce, prepared foods, quick lunches, Amazon returns, and nicer pantry staples.`,offerings:[`Full grocery with organic produce, meat/seafood, bakery, beer/wine/spirits`, `Hot bar, salad bar, custom cakes, sushi, coffee bar, cafe seating`, `Amazon Returns, pickup/delivery, Amazon Hub Locker+, self checkout`],watch:`Most expensive everyday basket; prepared-food venues have shorter hours than the grocery store.`,sourceLabel:`Whole Foods official store page`,sourceUrl:`https://www.wholefoodsmarket.com/stores/westloop`,note:`Large organic market; hot bar, prepared foods, beer/wine. Premium pricing.`},
+ {n:`Mariano's (Greektown)`,a:`40 S Halsted St`,lat:41.8811,lng:-87.6479,cat:`Full-service supermarket`,hours:`Daily ~6am–10pm`,rating:`~4.4`,cost:`$$ · usually cheaper than Whole Foods`,best:`Best all-around weekly grocery option if you want normal prices but still want prepared food and a large store.`,offerings:[`Full supermarket with produce, deli, meat/seafood, bakery, frozen and household basics`, `Prepared foods, sushi, salad bar / hot-food style options, coffee and grab-and-go meals`, `Kroger/Mariano's digital deals and loyalty pricing`],watch:`Inventory and freshness can vary by department; verify current pharmacy and prepared-food hours separately.`,sourceLabel:`Store listing / hours pages`,sourceUrl:`https://www.marianos.com/stores/grocery/il/chicago/halsted-monroe/531/00531`,note:`Full‑service; prepared‑foods hall, sushi, oyster bar, Stan's Donuts.`},
+ {n:`Jewel-Osco`,a:`370 N Desplaines St`,lat:41.8887,lng:-87.6451,cat:`Supermarket + pharmacy`,hours:`Daily 6am–12am`,rating:`~3.9`,cost:`$$ · strong weekly-ad/app-coupon value`,best:`Best for late-night basics, pharmacy access, normal brand-name groceries, and quick household runs.`,offerings:[`Full grocery, deli, bakery, meat/seafood, household basics and liquor`, `Pharmacy with separate hours, weekly ads, rewards/app coupons`, `Longest grocery hours in the immediate Fulton/West Loop cluster`],watch:`Less polished than Whole Foods/Mariano's; pharmacy does not match grocery-store hours.`,sourceLabel:`Jewel-Osco official store page`,sourceUrl:`https://local.jewelosco.com/il/chicago/370-n-des-plaines-st.html`,note:`Full‑service + pharmacy + liquor; long hours, mid‑price, broad selection.`},
+ {n:`Target — West Loop`,a:`1101 W Jackson Blvd`,lat:41.8771,lng:-87.6555,cat:`General store + grocery`,hours:`Daily 8am–10pm`,rating:`~4.0`,cost:`$–$$ · good for basics and household goods`,best:`Best for one-stop errands: groceries plus cleaning supplies, toiletries, pharmacy, tech, and apartment basics.`,offerings:[`Packaged groceries, frozen, dairy, snacks, household goods and personal care`, `CVS pharmacy, Starbucks, order pickup, Drive Up, same-day delivery via Shipt`, `Useful when furnishing or restocking the apartment after move-in`],watch:`Not a true full supermarket for produce/meat variety; CVS and Starbucks keep different hours.`,sourceLabel:`Target official store page`,sourceUrl:`https://www.target.com/sl/chicago-west-loop/2781`,note:`Large‑format; full grocery, CVS pharmacy, wine/beer; on‑site parking.`},
+ {n:`The Goddess and Grocer`,a:`911 W Randolph St`,lat:41.8841,lng:-87.6505,cat:`Specialty market / cafe`,hours:`Daily ~7am–7pm`,rating:``,cost:`$$$ · cafe/specialty pricing`,best:`Best for quick breakfasts, sandwiches, prepared meals, pastries, coffee, wine, and hosting snacks.`,offerings:[`Cafe counter, sandwiches, salads, baked goods and prepared meals`, `Gourmet pantry items, wine/beer, party trays and catering`, `Small-format neighborhood stop right on Randolph`],watch:`Not a full weekly grocery replacement; hours and catering pickup windows can vary.`,sourceLabel:`Goddess and Grocer site`,sourceUrl:`https://www.goddessandgrocer.com/`,note:`Gourmet market + cafe; prepared meals, pastries, wine. Small‑format, pricey.`},
+ {n:`Pete's Fresh Market`,a:`2333 W Madison St`,lat:41.8814,lng:-87.6856,cat:`Value supermarket`,hours:`Daily ~7am–9pm`,rating:`~4.4`,cost:`$–$$ · value pick for produce and staples`,best:`Best budget grocery run if you have a car or do a bigger weekly trip west of Fulton Market.`,offerings:[`Large produce section, butcher/meat, deli, bakery, international staples and household basics`, `Hot-food/prepared-food options, catering, delivery availability listed by third-party pages`, `Private lot parking; easiest if you are already driving`],watch:`Farther west than the apartment cluster; hours conflict across third-party listings, so verify before a late trip.`,sourceLabel:`Pete's Fresh store locator / listing`,sourceUrl:`https://www.petesfresh.com/stores`,note:`Local chain; huge produce, hot/salad bar, low prices. ~1.6 mi west.`},
+ {n:`Costco Wholesale`,a:`1430 S Ashland Ave`,lat:41.8620,lng:-87.6678,cat:`Warehouse club`,hours:`Mon–Fri 10am–8:30pm · Sat 9:30am–6pm · Sun 10am–6pm`,rating:`~4.5`,cost:`$65/yr Gold Star membership; bulk prices`,best:`Best for bulk household goods, paper products, frozen food, protein, gas, and roommate restocks.`,offerings:[`Warehouse groceries, bulk pantry, freezer, cleaning supplies, electronics and apartment basics`, `Gas, optical/pharmacy/services vary by location`, `Best with a car and storage space`],watch:`Membership required; bulk sizes can be awkward in a 2BR if storage is tight.`,sourceLabel:`Costco store / membership pages`,sourceUrl:`https://www.costco.com/warehouse-locations/chicago-south-loop-chicago-il-1138.html`,note:`Membership warehouse + gas; bulk groceries, low unit prices. ~1.8 mi SW.`}
+];
+const GYMS=[
+ {n:`East Bank Club`,a:`500 N Kingsbury St`,lat:41.8902,lng:-87.6394,cat:`Luxury athletic club`,hours:`Weekdays 5am–11pm · Weekends 7am–9pm`,rating:`~4.2`,cost:`$295/mo individual + $750 initiation; partner/family tiers available`,best:`Best true all-in-one club if you want premium facilities and will use pools, courts, recovery, coworking, spa and food options.`,offerings:[`350k+ sq ft club: strength, cardio, track, basketball, tennis, pickleball, racquet sports`, `Indoor/outdoor pools, whirlpools, sauna, steam, rooftop sun deck`, `Coworking, market, grill, juice bar, salon/spa, physical therapy, dry cleaning, car wash`],watch:`Very expensive and slightly east of Fulton; make sure you would use more than the weight room.`,sourceLabel:`East Bank official hours/membership`,sourceUrl:`https://eastbankclub.com/become-member`,note:`350k+ sq ft mega‑club; tennis, pickleball, basketball, pools, track. Premium + initiation.`},
+ {n:`Equinox Fulton Market`,a:`919 W Fulton Market`,lat:41.8863,lng:-87.6506,cat:`Luxury gym`,hours:`Mon–Thu 5am–10pm · Fri 5am–9pm · Sat/Sun 7am–7pm`,rating:``,cost:`Premium; exact local dues vary, expect high-$200s/mo+`,best:`Best polished luxury gym near Fulton Market if recovery, classes, locker rooms, and design matter.`,offerings:[`Strength/cardio floors, yoga, barre, running, cycling and signature group fitness`, `Spa/recovery emphasis with sauna, contrast therapy/plunge-style recovery, bodywork and skincare`, `New Fulton Market club in the Domino Sugar Factory area`],watch:`Not 24/7 and pricing is opaque; confirm parking validation and actual monthly dues.`,sourceLabel:`Equinox official club page`,sourceUrl:`https://www.equinox.com/clubs/chicago/fulton-market`,note:`New club in the Domino Sugar Factory; lap pool, spa, contrast therapy, signature classes.`},
+ {n:`MODE Gym`,a:`1301 W Madison St`,lat:41.8813,lng:-87.6603,cat:`Luxury gym / off-peak value option`,hours:`Access/hours vary by plan; marketed as West Loop 24-hour gym`,rating:`~4.6`,cost:`Promos around $55/mo off-peak; day pass listed around $40`,best:`Best value-luxury option if the off-peak plan fits your schedule and you want nicer equipment without East Bank/Equinox pricing.`,offerings:[`Strength/cardio equipment, personal training, boxing, recovery add-ons, body scans`, `Luxury lighting/music vibe; marketed around transformation/coaching packages`, `Useful west-end option near Parq/Fulton Fithouse cluster`],watch:`Cheap plans can be time-restricted; verify whether your desired hours are included.`,sourceLabel:`MODE membership / guest-pass pages`,sourceUrl:`https://join.mode24hourgym.com/`,note:`Boxing, cryotherapy, 3D body scan, in‑house DJ. Boutique‑premium.`},
+ {n:`GND Strength Society`,a:`1025 W Jackson Blvd`,lat:41.8778,lng:-87.6531,cat:`24/7 strength gym`,hours:`24/7 member access`,rating:``,cost:`Membership pricing not posted; personal training available for members and non-members`,best:`Best if you care about serious strength training, barbell work, HYROX-style conditioning, and flexible hours.`,offerings:[`24-hour access for members`, `Strength coaching, powerlifting/Olympic lifting style equipment, functional conditioning`, `Group fitness focused on strength, conditioning and mobility`],watch:`Less resort-style; confirm locker/shower setup and membership cost before counting on it.`,sourceLabel:`GND official FAQs`,sourceUrl:`https://www.gndstrength.com/faqs`,note:`Strength‑focused community gym; powerlifting, Olympic lifting, HYROX prep, classes.`},
+ {n:`1K Fulton Fitness`,a:`1000 W Fulton Market`,lat:41.8873,lng:-87.6526,cat:`Tenant-only fitness center`,hours:`Tenant access only`,rating:``,cost:`Not public; generally included/controlled through 1K Fulton tenancy`,best:`Only relevant if your employer or building gives you access; otherwise do not count it as an option.`,offerings:[`Private fitness center managed for building tenants`, `Convenient Fulton Market location`, `Potential amenity if you have tenant credentials`],watch:`Not a public gym; verify access before relying on it.`,sourceLabel:`1K Fulton / Kinema references`,sourceUrl:`https://www.1kfulton.com/`,note:`Private fitness center for 1K Fulton building tenants only (Kinema‑managed).`},
+ {n:`FFC West Loop`,a:`10 S Clinton St`,lat:41.8815,lng:-87.6416,cat:`Full-service health club`,hours:`Mon–Thu 5am–11pm · Fri 5am–9pm · Sat/Sun 7am–8pm`,rating:`~4.0`,cost:`$169–$239/mo posted plans + enrollment fee`,best:`Best practical full-service gym for your commute because it is right by Ogilvie and has real amenities without East Bank pricing.`,offerings:[`Strength/cardio, indoor turf, group fitness, yoga, Pilates, personal training`, `Indoor pool, outdoor pool, whirlpool/steam, recovery lounge, red light/infrared sauna options`, `2 hours free parking listed; great for train-day workouts`],watch:`Can get commuter-busy; choose plan tier carefully if you want access beyond West Loop/Union Station.`,sourceLabel:`FFC West Loop official page`,sourceUrl:`https://ffc.com/club-locations/west-loop`,note:`Near Ogilvie/Union; indoor + outdoor pool, Pilates, classes. (There's also an FFC in Elmhurst near work.)`},
+ {n:`West Loop Athletic Club`,a:`1380 W Randolph St`,lat:41.8846,lng:-87.6640,cat:`Neighborhood athletic club`,hours:`Mon–Thu 5:30am–9pm · Fri 5:30am–8pm · Weekends 7am–7pm`,rating:`~4.4`,cost:`Membership pricing varies; ask CAC for current West Loop/all-club dues`,best:`Best neighborhood club if you want pool/classes/training with a less glossy vibe than Equinox/FFC.`,offerings:[`Weight room, cardio, functional turf, personal training`, `Lap pool, group classes, rowing/barre/cycling/yoga-style programming`, `Chicago Athletic Clubs network access depending on membership`],watch:`Not as late as FFC; verify pool availability and exact membership tier.`,sourceLabel:`Chicago Athletic Clubs West Loop`,sourceUrl:`https://www.chicagoathleticclubs.com/locations/west-loop/`,note:`Chicago Athletic Clubs; low‑key neighborhood vibe, classes, courts, training.`},
+ {n:`Studio Three`,a:`333 N Green St`,lat:41.8877,lng:-87.6481,cat:`Boutique class studio`,hours:`Mon 5:30am–8:45pm · Tue–Thu 5:30am–8pm · Fri 5:30am–7pm · Sat 7am–2pm · Sun 8am–6:30pm`,rating:`~4.6`,cost:`Boutique pricing; class packs/memberships vary, drop-ins commonly around $40`,best:`Best if you want variety without joining a normal gym: HIIT, cycling and yoga in one membership/class-pack ecosystem.`,offerings:[`Interval/HIIT, cycle, yoga, heated classes and recovery sauna`, `High-energy class schedule in the heart of Fulton Market`, `$5 validated parking up to 90 minutes listed by studio`],watch:`Class-based only; not a place for open lifting whenever you want.`,sourceLabel:`Studio Three official Fulton Market page`,sourceUrl:`https://studiothree.com/studio/fulton-market/`,note:`3‑in‑1: HIIT, cycling, yoga + recovery sauna.`},
+ {n:`Orangetheory — West Loop`,a:`823 W Madison St`,lat:41.8816,lng:-87.6482,cat:`Boutique HIIT studio`,hours:`Class schedule based; early morning through evening most weekdays`,rating:`~4.6`,cost:`Casual visit MSRP listed at $35; memberships vary by studio`,best:`Best structured cardio/strength accountability if you like coached classes and heart-rate tracking.`,offerings:[`Tread/rower/floor interval classes`, `Coach-led heart-rate-zone training and measurable benchmarks`, `Predictable 1-hour workout format`],watch:`No open gym; peak class times can fill and monthly price depends on class count.`,sourceLabel:`Orangetheory West Loop official page`,sourceUrl:`https://www.orangetheory.com/en-us/locations/chicago-illinois-0330`,note:`Heart‑rate‑based HIIT interval classes. Mid‑price chain.`},
+ {n:`CorePower Yoga — West Loop`,a:`1313 W Randolph St`,lat:41.8843,lng:-87.6637,cat:`Yoga studio`,hours:`Class schedule based; generally morning through evening`,rating:`~4.7`,cost:`$35 single class; $189/mo all-access posted`,best:`Best flexible yoga/sculpt option if you want a national studio network and heated classes.`,offerings:[`Vinyasa-style yoga, Yoga Sculpt, restorative / strength-adjacent formats`, `Locker rooms and showers; mat/towel rentals available`, `Free parking lot spaces listed for this studio`],watch:`Pricing excludes taxes/surcharges; class quality and heat intensity are taste-dependent.`,sourceLabel:`CorePower West Loop official page`,sourceUrl:`https://www.corepoweryoga.com/yoga-studios/il/chicago/west-loop`,note:`Heated power yoga + sculpt classes; clean, popular.`},
+ {n:`[solidcore] — West Loop`,a:`7 S Halsted St`,lat:41.8814,lng:-87.6471,cat:`Pilates / resistance studio`,hours:`Mon 6am–7:30pm · Tue/Thu 6am–8:30pm · Wed 6am–7:30pm · Fri 6am–6:30pm · Sat 8am–12:15pm · Sun 9am–3pm`,rating:``,cost:`Premium class packs/memberships; Wellhub Gold+ access shown in listings`,best:`Best intense low-impact resistance workout near the central apartment cluster.`,offerings:[`Slow, high-tension reformer-style Pilates/resistance classes`, `Small class format, coaching and progressive muscle fatigue focus`, `Easy to pair with apartments near Halsted/Madison`],watch:`Class-only and pricey; not a full gym, and weekend hours are short.`,sourceLabel:`solidcore / Wellhub location pages`,sourceUrl:`https://solidcore.co/studios/west-loop`,note:`High‑intensity, low‑impact reformer Pilates. Premium boutique.`},
+ {n:`Barry's — Fulton Market`,a:`936 W Fulton Market`,lat:41.8870,lng:-87.6513,cat:`Boutique HIIT studio`,hours:`Class schedule based; morning, lunch and evening blocks`,rating:``,cost:`Premium class packs/memberships; verify current drop-in price`,best:`Best high-energy treadmill + strength class if you want intensity and a polished boutique vibe.`,offerings:[`Red Room treadmill and strength intervals`, `Signature Barry's programming, retail, locker-room amenities`, `Good Fulton Market location near Studio Three and Equinox`],watch:`Not open gym; expensive if used as your only fitness routine.`,sourceLabel:`Barry's Fulton Market`,sourceUrl:`https://www.barrys.com/studio/fulton-market/`,note:`Red Room treadmill + strength HIIT bootcamp. High‑energy, premium.`},
+ {n:`CrossTown Fitness`,a:`1031 W Madison St`,lat:41.8815,lng:-87.6533,cat:`HIIT / strength studio`,hours:`Mon–Thu 5am–1pm & 4pm–8:30pm · Fri 5am–1pm & 4pm–6:30pm · Sat/Sun 7am–1pm`,rating:`~4.8`,cost:`Class-pack / membership pricing varies; check current promos`,best:`Best serious group training option if you want strength plus conditioning without treadmill-only classes.`,offerings:[`Strength, endurance, interval cardio and mobility programming`, `Small-group coached classes and personal training`, `Good for people who like real weights in class formats`],watch:`Midday closure and short weekend hours; schedule matters.`,sourceLabel:`CrossTown Fitness West Loop`,sourceUrl:`https://crosstownfitness.com/locations/west-loop/`,note:`Hour‑long cardio + strength group classes + personal training.`},
+ {n:`First Ascent — West Loop`,a:`100 S Morgan St`,lat:41.8801,lng:-87.6524,cat:`Climbing gym`,hours:`Mon–Fri 6am–11pm · weekend hours vary`,rating:``,cost:`Climbing-gym membership/day-pass pricing; verify current West Loop rates`,best:`Best social fitness option if you want bouldering/ropes plus strength/yoga instead of a standard gym.`,offerings:[`Bouldering and roped climbing, training boards, strength/cardio support`, `Yoga/fitness classes and climbing community events`, `Good cross-training alternative to normal lifting`],watch:`Gear/rental costs and climbing learning curve; verify West Loop hours after reopening changes.`,sourceLabel:`First Ascent official site`,sourceUrl:`https://faclimbing.com/`,note:`20k sq ft bouldering + roped climbing to 50 ft, Kilter board, yoga. Reopened Feb 2026.`},
+ {n:`Fulton Fithouse`,a:`1406 W Fulton St`,lat:41.8867,lng:-87.6628,cat:`Boutique / personal training`,hours:`Mon–Fri 5am–8pm · weekends by appointment/classes`,rating:``,cost:`Coaching/class pricing varies; contact for current packages`,best:`Best if you want local, coaching-heavy functional strength rather than a big-box gym.`,offerings:[`Functional strength, small-group training and one-on-one coaching`, `Black-owned boutique gym; personal attention and community feel`, `Close to Parq / far-west Fulton Market options`],watch:`Not a full open-gym replacement; weekend and appointment access should be confirmed.`,sourceLabel:`Fulton Fithouse official site`,sourceUrl:`https://fultonfithouse.com/`,note:`Black‑owned boutique; functional strength, small‑group & 1:1 training.`}
+];
+
+/* walking routes (OSRM foot); 212 W Washington hand-corrected */
+const ROUTES={
+1:[[41.88869,-87.6418],[41.88869,-87.64174],[41.88863,-87.64173],[41.88853,-87.64168],[41.88847,-87.64161],[41.8884,-87.6415],[41.88816,-87.6415],[41.88796,-87.6415],[41.88729,-87.64148],[41.88692,-87.64147],[41.88675,-87.64148],[41.88672,-87.64143],[41.88665,-87.64128],[41.88662,-87.64123],[41.88583,-87.64015],[41.88577,-87.64008],[41.88569,-87.64002],[41.88563,-87.63998],[41.88523,-87.63996],[41.88456,-87.63993],[41.88449,-87.63993],[41.88436,-87.63994],[41.88382,-87.63993],[41.88333,-87.6399],[41.88333,-87.63984],[41.88329,-87.63969],[41.88329,-87.63964],[41.8832,-87.63962],[41.8831,-87.63958],[41.88304,-87.63958],[41.88275,-87.63956],[41.8826,-87.63956]],
+2:[[41.88515,-87.6471],[41.88515,-87.64735],[41.88507,-87.64735],[41.88461,-87.64734],[41.88442,-87.64733],[41.88425,-87.64732],[41.88378,-87.64732],[41.88327,-87.64729],[41.88326,-87.64684],[41.88326,-87.64636],[41.88327,-87.64599],[41.88327,-87.64561],[41.88326,-87.64526],[41.88327,-87.6443],[41.88327,-87.64425],[41.88327,-87.64408],[41.88328,-87.64284],[41.88328,-87.64271],[41.88328,-87.64259],[41.88319,-87.64258],[41.88307,-87.64257],[41.88307,-87.64229],[41.88307,-87.64191],[41.88308,-87.64175],[41.88308,-87.64137],[41.88307,-87.64126],[41.88305,-87.64117],[41.88304,-87.6411],[41.88305,-87.64028],[41.88305,-87.63992],[41.88305,-87.63974],[41.88304,-87.63963],[41.88304,-87.63958],[41.88275,-87.63956],[41.8826,-87.63956]],
+3:[[41.8832,-87.6506],[41.88321,-87.64986],[41.88321,-87.64967],[41.88323,-87.64868],[41.88323,-87.6485],[41.88324,-87.64752],[41.88306,-87.64752],[41.88305,-87.64741],[41.88305,-87.64727],[41.88306,-87.64659],[41.88307,-87.64615],[41.88306,-87.64558],[41.88307,-87.64528],[41.88307,-87.64511],[41.88307,-87.6443],[41.88307,-87.64414],[41.88307,-87.64321],[41.88307,-87.6428],[41.88307,-87.6426],[41.88307,-87.6425],[41.88307,-87.64229],[41.88307,-87.64191],[41.88308,-87.64175],[41.88308,-87.64137],[41.88307,-87.64126],[41.88305,-87.64117],[41.88304,-87.6411],[41.88305,-87.64028],[41.88305,-87.63992],[41.88305,-87.63974],[41.88304,-87.63963],[41.88304,-87.63958],[41.88275,-87.63956],[41.8826,-87.63956]],
+4:[[41.8882,-87.64748],[41.88773,-87.64746],[41.88691,-87.6474],[41.88688,-87.64672],[41.88688,-87.64616],[41.88689,-87.64583],[41.88689,-87.6457],[41.88689,-87.64561],[41.8868,-87.64558],[41.88672,-87.64556],[41.88671,-87.64442],[41.88671,-87.64428],[41.88671,-87.64414],[41.88672,-87.64353],[41.88672,-87.64294],[41.88672,-87.64276],[41.88671,-87.64267],[41.88672,-87.64209],[41.88672,-87.64148],[41.88668,-87.64136],[41.88663,-87.64125],[41.88662,-87.64123],[41.88583,-87.64015],[41.88577,-87.64008],[41.88569,-87.64002],[41.88563,-87.63998],[41.88523,-87.63996],[41.88456,-87.63993],[41.88449,-87.63993],[41.88436,-87.63994],[41.88382,-87.63993],[41.88333,-87.6399],[41.88333,-87.63984],[41.88329,-87.63969],[41.88329,-87.63964],[41.8832,-87.63962],[41.8831,-87.63958],[41.88304,-87.63958],[41.88275,-87.63956],[41.8826,-87.63956]],
+5:[[41.8836,-87.6345],[41.8836,-87.636],[41.8835,-87.6378],[41.8834,-87.6392],[41.8833,-87.6396],[41.8829,-87.6396],[41.8826,-87.6395]],
+6:[[41.88435,-87.6627],[41.88436,-87.66218],[41.88439,-87.66085],[41.88439,-87.66064],[41.884,-87.66053],[41.88401,-87.66013],[41.88402,-87.65893],[41.88403,-87.65838],[41.88404,-87.65777],[41.88405,-87.65679],[41.8835,-87.65677],[41.88309,-87.65676],[41.8831,-87.65612],[41.8831,-87.65568],[41.88311,-87.65547],[41.88312,-87.65451],[41.88313,-87.6543],[41.88314,-87.65396],[41.88315,-87.65335],[41.88315,-87.65313],[41.88316,-87.65219],[41.88317,-87.65198],[41.88318,-87.65143],[41.88319,-87.65083],[41.8832,-87.65034],[41.88321,-87.64986],[41.88323,-87.64868],[41.88324,-87.64752],[41.88306,-87.64752],[41.88305,-87.64727],[41.88306,-87.64659],[41.88307,-87.64558],[41.88307,-87.6443],[41.88307,-87.64321],[41.88307,-87.6426],[41.88307,-87.64229],[41.88308,-87.64175],[41.88308,-87.64137],[41.88305,-87.64117],[41.88305,-87.64028],[41.88305,-87.63992],[41.88304,-87.63963],[41.88304,-87.63958],[41.88275,-87.63956],[41.8826,-87.63956]]
+};
+
+/* bus/'L' alternatives — real Google Maps options, street-following OSRM geometry */
+const ALTS={
+1:{text:`Walking is fastest (~10 min to Ogilvie) — Google shows no quicker bus/'L'. The Clinton Green/Pink 'L' stop is right here for getting around town.`},
+2:{text:`#56 Milwaukee or #20 Madison bus → Ogilvie ~9 min (≈39 min to Elmhurst), vs ~13 min walk.`,route:[[41.88515,-87.6471],[41.88515,-87.64735],[41.88514,-87.64735],[41.8851,-87.64735],[41.88507,-87.64735],[41.88505,-87.64735],[41.88461,-87.64734],[41.88459,-87.64734],[41.88451,-87.64733],[41.88442,-87.64733],[41.88433,-87.64732],[41.88425,-87.64732],[41.88422,-87.64732],[41.88378,-87.64732],[41.88373,-87.64731],[41.88369,-87.64731],[41.88327,-87.64729],[41.88324,-87.64728],[41.88315,-87.64727],[41.88307,-87.64727],[41.88295,-87.64727],[41.88189,-87.64724],[41.88189,-87.64671],[41.8819,-87.6466],[41.88189,-87.64647],[41.88179,-87.64649],[41.88179,-87.64629],[41.8818,-87.64583],[41.8818,-87.64573],[41.88181,-87.64526],[41.88181,-87.64485],[41.88181,-87.64468],[41.88182,-87.64425],[41.88182,-87.64411],[41.88173,-87.6441],[41.88117,-87.6441],[41.88062,-87.64409],[41.88053,-87.64409],[41.88053,-87.64396],[41.88054,-87.64316],[41.88054,-87.64275],[41.88054,-87.64249],[41.88056,-87.64152],[41.88057,-87.64117],[41.88057,-87.64103],[41.88059,-87.64024],[41.8806,-87.63981],[41.8806,-87.63969],[41.88067,-87.6397],[41.88108,-87.6397],[41.88137,-87.63969],[41.88179,-87.6397],[41.88199,-87.63971],[41.8822,-87.63971],[41.88254,-87.63973],[41.88255,-87.63955],[41.88255,-87.63953]]},
+3:{text:`#20 Madison bus (board Madison & Peoria) → Ogilvie ~9 min (≈39 min to Elmhurst), vs ~12 min walk.`,route:[[41.8832,-87.6506],[41.8832,-87.65034],[41.88321,-87.64986],[41.88317,-87.64986],[41.88304,-87.64986],[41.8827,-87.64984],[41.88217,-87.64982],[41.88185,-87.64981],[41.88185,-87.6497],[41.88186,-87.6488],[41.88176,-87.6488],[41.88176,-87.64853],[41.88177,-87.64843],[41.88177,-87.6481],[41.88177,-87.64778],[41.88178,-87.64748],[41.88178,-87.64736],[41.88169,-87.64736],[41.88147,-87.64735],[41.88106,-87.64734],[41.8807,-87.64733],[41.88058,-87.64732],[41.8805,-87.64732],[41.8805,-87.64658],[41.88051,-87.64628],[41.88052,-87.64517],[41.88053,-87.6447],[41.88053,-87.64421],[41.88053,-87.64409],[41.88053,-87.64396],[41.88054,-87.64316],[41.88054,-87.64275],[41.88054,-87.64249],[41.88056,-87.64152],[41.88057,-87.64117],[41.88057,-87.64103],[41.88059,-87.64024],[41.8806,-87.63981],[41.8806,-87.63969],[41.88067,-87.6397],[41.88108,-87.6397],[41.88137,-87.63969],[41.88179,-87.6397],[41.88199,-87.63971],[41.8822,-87.63971],[41.88254,-87.63973],[41.88255,-87.63955],[41.88255,-87.63953]]},
+4:{text:`#56 Milwaukee bus (board Milwaukee & Union) ~12 min, or #20 Madison ~13 min (≈42 min to Elmhurst), vs ~14 min walk.`,route:[[41.8882,-87.64748],[41.88846,-87.64749],[41.88869,-87.64747],[41.88884,-87.64748],[41.8891,-87.64749],[41.88954,-87.6475],[41.88999,-87.6475],[41.89019,-87.6475],[41.89019,-87.64706],[41.8902,-87.64625],[41.8901,-87.64607],[41.89001,-87.64594],[41.89001,-87.64583],[41.89002,-87.64572],[41.89002,-87.64562],[41.88998,-87.64556],[41.88967,-87.64509],[41.8896,-87.64497],[41.8895,-87.64498],[41.88931,-87.64469],[41.88923,-87.64456],[41.88905,-87.64434],[41.88905,-87.64421],[41.88906,-87.64413],[41.88907,-87.64301],[41.88907,-87.6428],[41.88907,-87.64239],[41.88908,-87.64177],[41.88905,-87.64167],[41.88902,-87.64159],[41.88897,-87.64151],[41.88889,-87.64142],[41.88876,-87.64139],[41.88872,-87.64138],[41.88831,-87.64138],[41.88816,-87.64138],[41.88799,-87.64137],[41.88763,-87.64137],[41.88692,-87.64136],[41.88668,-87.64136],[41.88601,-87.64135],[41.88572,-87.64134],[41.88537,-87.64133],[41.88516,-87.64133],[41.88455,-87.64131],[41.88436,-87.64131],[41.88351,-87.64128],[41.88331,-87.64127],[41.88307,-87.64126],[41.8829,-87.64126],[41.88203,-87.64123],[41.88187,-87.64121],[41.88158,-87.6412],[41.88117,-87.64119],[41.88091,-87.64118],[41.88067,-87.64117],[41.88057,-87.64117],[41.88057,-87.64103],[41.88059,-87.64024],[41.8806,-87.63981],[41.8806,-87.63969],[41.88067,-87.6397],[41.88108,-87.6397],[41.88137,-87.63969],[41.88179,-87.6397],[41.88199,-87.63971],[41.8822,-87.63971],[41.88254,-87.63973],[41.88255,-87.63955],[41.88255,-87.63953]]},
+5:{text:`Walking is fastest (~7 min to Ogilvie) — Google shows no quicker transit.`},
+6:{text:`Green/Pink 'L' (board Ashland → ride to Clinton → walk) ~15 min, or #20 Madison bus (Madison & Throop) ~18 min (≈45 min to Elmhurst) — both beat the ~27 min walk.`,route:[[41.88435,-87.6627],[41.88434,-87.66298],[41.88428,-87.66305],[41.88424,-87.6631],[41.88428,-87.66324],[41.88432,-87.66333],[41.88438,-87.66346],[41.88443,-87.6636],[41.8852,-87.66488],[41.88528,-87.66499],[41.88528,-87.66517],[41.88526,-87.66537],[41.8853,-87.66538],[41.88543,-87.66538],[41.88547,-87.66538],[41.88546,-87.66545],[41.88546,-87.66553],[41.88544,-87.66663],[41.8856,-87.66664],[41.88544,-87.66663],[41.88537,-87.66544],[41.88537,-87.66523],[41.88537,-87.66507],[41.88539,-87.66437],[41.88539,-87.66418],[41.8854,-87.6638],[41.88541,-87.66294],[41.88542,-87.66261],[41.88543,-87.66209],[41.88544,-87.66159],[41.88545,-87.66088],[41.88546,-87.66066],[41.88547,-87.65992],[41.88547,-87.65924],[41.88548,-87.65885],[41.88549,-87.65801],[41.8855,-87.65767],[41.88551,-87.65692],[41.88551,-87.6568],[41.88551,-87.65668],[41.88553,-87.65575],[41.88553,-87.65554],[41.88555,-87.65458],[41.88555,-87.65437],[41.88557,-87.65341],[41.88557,-87.65321],[41.88559,-87.65225],[41.88559,-87.65209],[41.88561,-87.65135],[41.88561,-87.65109],[41.88562,-87.65087],[41.88563,-87.64996],[41.88564,-87.64982],[41.88564,-87.64968],[41.88565,-87.64879],[41.88565,-87.64865],[41.88566,-87.64851],[41.88567,-87.64759],[41.88567,-87.64736],[41.88569,-87.64665],[41.88569,-87.64622],[41.8857,-87.64553],[41.8857,-87.64525],[41.88571,-87.64437],[41.88571,-87.64412],[41.88571,-87.64352],[41.88572,-87.64291],[41.88571,-87.64267],[41.88572,-87.64206],[41.88572,-87.64145],[41.88572,-87.64134],[41.88563,-87.64134],[41.8853,-87.64133],[41.8853,-87.64116],[41.88521,-87.64118],[41.88516,-87.64118],[41.88456,-87.64116],[41.88451,-87.64116],[41.88441,-87.64115],[41.88436,-87.64115],[41.88429,-87.64114],[41.88408,-87.64113],[41.8838,-87.64113],[41.88377,-87.64103],[41.88377,-87.64074],[41.88378,-87.6406],[41.88378,-87.64031],[41.88378,-87.64017],[41.88379,-87.64003],[41.88376,-87.63995],[41.88333,-87.6399],[41.88333,-87.63984],[41.88329,-87.63969],[41.8832,-87.63962],[41.8831,-87.63958],[41.88304,-87.63958],[41.88275,-87.63956],[41.8826,-87.63956]]}
+};
+
+const $=s=>document.querySelector(s);
+function hasAlt(id){return !!(ALTS[id]&&ALTS[id].route);}
+function money(n){return `$${Math.round(n).toLocaleString()}`;}
+function setMapMeta(html){const el=$('#mapmeta');if(el)el.innerHTML=html;}
+function renderSummary(){
+ const cheapest=APTS.reduce((m,a)=>a.rentLow<m.rentLow?a:m,APTS[0]);
+ const fastest=APTS.reduce((m,a)=>a.totalMin<m.totalMin?a:m,APTS[0]);
+ const largest=APTS.reduce((m,a)=>a.sqftSort>m.sqftSort?a:m,APTS[0]);
+ $('#summary').innerHTML=`
+  <div class="metric"><strong>${fastest.totalMin}m</strong><span>fastest</span></div>
+  <div class="metric"><strong>${money(cheapest.rentLow)}</strong><span>lowest rent</span></div>
+  <div class="metric"><strong>${largest.sqftSort.toLocaleString()}</strong><span>most sqft</span></div>`;
+}
+function cardHtml(a){
+ return `<button class="apt-card" data-id="${a.id}">
+  <div class="apt-top">
+    <span class="num">${a.id}</span>
+    <span class="apt-main"><span class="apt-name">${a.name}</span><span class="apt-area">${a.area}</span></span>
+  </div>
+  <div class="apt-meta">
+    <div><b>${a.rentShort}</b><span>rent</span></div>
+    <div><b>${a.sqftShort}</b><span>space</span></div>
+    <div><b>${a.totalMin}m</b><span>Elmhurst</span></div>
+  </div>
+ </button>`;
+}
+function renderList(rows=APTS){
+ const list=$('#apartmentList');if(!list)return;
+ list.innerHTML=rows.map(cardHtml).join('');
+ list.querySelectorAll('.apt-card').forEach(card=>{card.onclick=()=>{const id=+card.dataset.id;openSide(id);focusPin(id,false);};});
+}
+function highlightCard(id){document.querySelectorAll('.apt-card').forEach(card=>card.classList.toggle('active',+card.dataset.id===id));}
+
+/* ---------- side panel ---------- */
+function stars(rating){const m=String(rating).match(/(\d\.\d)/);if(!m) return `<span class="chip soft">${rating}</span>`;const n=Math.round(parseFloat(m[1]));let s='';for(let i=1;i<=5;i++)s+=`<span class="star ${i<=n?'on':''}">★</span>`;return `<span class="stars">${s}</span><span class="ratenum">${m[1]}</span>`;}
+function chip(t,c){return `<span class="chip ${c||''}">${t}</span>`;}
+function buildSide(a){
+ const pool=/pool/i.test(a.gym), parkWarn=/verify|offsite|outdoor/i.test(a.parking), li=arr=>arr.map(t=>`<li>${t}</li>`).join('');
+ const toggle=`<div class="rtoggle"><button class="rt" data-m="walk">Walking</button>${hasAlt(a.id)?`<button class="rt" data-m="transit">Bus / 'L'</button>`:`<button class="rt" disabled title="walking is fastest">Bus / 'L' n/a</button>`}</div>`;
+ return `
+  <div class="shead"><div class="sname">${a.id}. ${a.name}</div><div class="sarea">${a.area} · ${a.bedbath}</div><div class="verdict">${a.verdict}</div></div>
+  <div class="sbody">
+    <div class="tiles">
+      <div class="tile"><div class="tn">${a.rentShort}</div><div class="tl">rent /mo</div></div>
+      <div class="tile"><div class="tn">${a.sqftShort}</div><div class="tl">sq ft</div></div>
+      <div class="tile"><div class="tn">${a.totalMin}m</div><div class="tl">to Elmhurst</div></div>
+    </div>
+    <div class="atline">Rent range: <b>${a.rentText}</b></div>
+    <div class="commstrip"><b>${a.walkMin}m</b> walk <span class="arrow">›</span> <b>~30m</b> UP‑W train <span class="arrow">›</span> McMaster shuttle</div>
+    <div class="atline" style="color:#6b7280">Route view: ${toggle}</div>
+    <section class="s"><h5>Walking</h5><p style="color:#6b7280">${a.walk}</p></section>
+    <section class="s"><h5>Alternative routes (bus / 'L')</h5><p>${ALTS[a.id]?ALTS[a.id].text:'—'}</p></section>
+    <div class="chips">${chip('In‑unit laundry')}${chip('Parking '+a.parkShort, parkWarn?'warn':'')}${chip('Gym')}${pool?chip('Pool'):''}${chip('Pets OK','soft')}</div>
+    <section class="s"><h5>Move‑in</h5><p><b>${a.movein}</b><br><span style="color:#6b7280;font-size:11.5px">${a.moveinNote}</span></p></section>
+    <section class="s"><h5>Amenities</h5><p>${a.gym}<br><span style="color:#6b7280;font-size:11.5px">${a.parking} · Concession: ${a.concession} · ${a.scores}</span></p></section>
+    <section class="s"><h5>Resident reviews &nbsp; ${stars(a.rating)}</h5><p>${a.reviews}</p></section>
+    <section class="s pc2"><div><h5>Pros</h5><ul class="pc pros">${li(a.pros)}</ul></div><div><h5>Cons</h5><ul class="pc cons">${li(a.cons)}</ul></div></section>
+    <details class="conf"><summary>⚑ Verify before signing</summary><p>${a.conf}</p></details>
+    <div class="btns"><a class="btn primary" href="${a.zillow}" target="_blank" rel="noopener">View on Zillow ↗</a>${a.sources.map(s=>`<a class="btn" href="${s.u}" target="_blank" rel="noopener">${s.l} ↗</a>`).join('')}</div>
+  </div>`;
+}
+function buildPlaceSide(p,type){
+ const tone=type==='gym'?'#e08a25':'#2e9e5b', label=type==='gym'?'Gym':'Grocery';
+ const offers=(p.offerings||[]).map(item=>`<li>${item}</li>`).join('');
+ return `
+  <div class="shead" style="border-top-color:${tone}"><div class="sname">${p.n}</div><div class="sarea">${label} · ${p.cat}</div><div class="verdict" style="background:#f6f8fb;color:#33405a;border-color:#e1e8ef">${p.a}</div></div>
+  <div class="sbody place-body">
+    <div class="place-summary">
+      <div class="place-row"><b>Hours</b><span>${p.hours||'Verify current hours'}</span></div>
+      <div class="place-row"><b>Cost</b><span>${p.cost||'Verify current pricing'}</span></div>
+      <div class="place-row"><b>Rating</b><span>${p.rating||'Not enough review data'}</span></div>
+    </div>
+    <section class="s"><h5>Best For</h5><div class="fit-note">${p.best||p.note}</div></section>
+    ${offers?`<section class="s"><h5>Offerings</h5><ul class="offer-list">${offers}</ul></section>`:''}
+    ${p.watch?`<section class="s"><h5>Watch Outs</h5><div class="watch-note">${p.watch}</div></section>`:''}
+    <div class="btns">${p.sourceUrl?`<a class="btn primary" href="${p.sourceUrl}" target="_blank" rel="noopener">${p.sourceLabel||'Source'} ↗</a>`:''}</div>
+  </div>`;
+}
+let activeId=null, activePlace=null, routeMode='walk';
+function openSide(id){const a=APTS.find(x=>x.id===id);if(!a)return;activeId=id;activePlace=null;
+ const eff=(routeMode==='transit'&&hasAlt(id))?'transit':'walk';
+ $('#sidecontent').innerHTML=buildSide(a);
+ document.querySelectorAll('#sidecontent .rt').forEach(b=>{b.classList.toggle('active',b.dataset.m===eff);if(!b.disabled)b.onclick=()=>setMode(b.dataset.m);});
+ $('#side').classList.add('open');highlightRow(id);highlightCard(id);showRoute(id,eff);
+ setMapMeta(`<b>${a.name}</b><br>${a.walk} to Ogilvie · ${a.totalText} by walk + UP-W`);
+}
+function openPlace(type,index){const arr=type==='gym'?GYMS:GROCERY,p=arr[index];if(!p)return;activeId=null;activePlace={type,index};clearRoute();highlightRow(null);highlightCard(null);$('#sidecontent').innerHTML=buildPlaceSide(p,type);$('#side').classList.add('open');setMapMeta(`<b>${p.n}</b><br>${p.hours||p.cat} · ${p.cost||p.a}`);}
+function setMode(m){routeMode=m;if(activeId==null)return;const eff=(m==='transit'&&hasAlt(activeId))?'transit':'walk';document.querySelectorAll('#sidecontent .rt').forEach(b=>b.classList.toggle('active',b.dataset.m===eff));showRoute(activeId,eff);}
+function closeSide(){$('#side').classList.remove('open');clearRoute();document.querySelectorAll('#cmp tbody tr').forEach(tr=>tr.classList.remove('active'));highlightCard(null);activeId=null;activePlace=null;setMapMeta(`<b>${APTS.length} apartment finalists</b><br>Blue line = Metra UP-W. Dashed red = Elmhurst shuttle leg.`);}
+
+/* ---------- table ---------- */
+function rowHtml(a){return `<tr data-id="${a.id}"><td><b>${a.id}. ${a.name}</b><div class="mini">${a.area}</div></td><td>${a.rentShort}</td><td>${a.sqftShort}</td><td>${a.totalMin}m<div class="mini">${a.walkMin}m walk</div></td><td><span class="pill">${a.rating}</span></td></tr>`;}
+function renderTable(rows){$('#cmp tbody').innerHTML=rows.map(rowHtml).join('');document.querySelectorAll('#cmp tbody tr').forEach(tr=>{tr.onclick=()=>{const id=+tr.dataset.id;openSide(id);focusPin(id,false);};});}
+function highlightRow(id){document.querySelectorAll('#cmp tbody tr').forEach(tr=>tr.classList.toggle('active',+tr.dataset.id===id));}
+let sortDir={};
+document.querySelectorAll('#cmp th').forEach(th=>{th.onclick=()=>{const k=th.dataset.k;sortDir[k]=!sortDir[k];const d=sortDir[k]?1:-1;const rows=[...APTS].sort((x,y)=>{const xv=x[k]??x.name,yv=y[k]??y.name;return (typeof xv==='number'?xv-yv:String(xv).localeCompare(String(yv)))*d;});renderTable(rows);};});
+renderSummary();
+renderList(APTS);
+renderTable(APTS);
+
+/* ---------- map (guarded) ---------- */
+let aptMarkers={}, _map=null, _ALL=null, shownRoute=null;
+function makePinIcon(num,color){const svg=`<svg width="32" height="42" viewBox="0 0 32 42" xmlns="http://www.w3.org/2000/svg"><path d="M16 1C8.3 1 2 7.3 2 15c0 10.3 14 25.5 14 25.5S30 25.3 30 15C30 7.3 23.7 1 16 1z" fill="${color}" stroke="#fff" stroke-width="2.5"/><circle cx="16" cy="15" r="9" fill="#fff"/><text x="16" y="19.5" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="13" font-weight="700" fill="${color}">${num}</text></svg>`;return L.divIcon({html:svg,className:'pinico',iconSize:[32,42],iconAnchor:[16,42],popupAnchor:[0,-38],tooltipAnchor:[0,-36]});}
+function makePlaceIcon(type){const label=type==='gym'?'F':'G';return L.divIcon({html:`<span class="place-pin">${label}</span>`,className:`placeico ${type}`,iconSize:[32,32],iconAnchor:[16,16],popupAnchor:[0,-16],tooltipAnchor:[0,-18]});}
+function focusPin(id,openPopup=true){const a=APTS.find(x=>x.id===id);if(_map&&a){_map.setView([a.lat,a.lng],15,{animate:true});if(openPopup&&aptMarkers[id])aptMarkers[id].openPopup();}}
+function clearRoute(){if(shownRoute&&_map){_map.removeLayer(shownRoute);}shownRoute=null;}
+function fitWalk(coords){if(!_map||!coords||!coords.length)return;try{_map.fitBounds(L.latLngBounds(coords).pad(.28),{paddingTopLeft:[24,72],paddingBottomRight:[460,56],animate:true});}catch(e){}}
+function showRoute(id,mode){
+ if(!_map)return;clearRoute();
+ const coords=(mode==='transit'&&hasAlt(id))?ALTS[id].route:ROUTES[id];if(!coords)return;
+ const walkStyle=mode==='transit'?{color:'#0b7d78',weight:5,opacity:.95,dashArray:'8 6'}:{color:'#24446f',weight:5,opacity:.97};
+ shownRoute=L.layerGroup([
+  L.polyline(TRAIN,{color:'#2b7de0',weight:4,opacity:.78}),
+  L.polyline([ELMHURST,MCMASTER],{color:'#c0392b',weight:3,dashArray:'4 7',opacity:.82}),
+  L.polyline(coords,walkStyle)
+ ]).addTo(_map);
+ shownRoute.eachLayer(layer=>layer.bringToFront&&layer.bringToFront());
+ fitWalk(coords);
+}
+function popupHtml(a){return `<div class="lpop"><b>${a.id}. ${a.name}</b><div class="lcat">${a.area} · ${a.bedbath}</div><div class="laddr">${a.rentShort} · ${a.sqftShort} sf · ~${a.totalMin} min to Elmhurst</div><div class="lmeta">${a.laundry} · Parking ${a.parkShort}</div></div>`;}
+function lpop(g){return `<div class="lpop"><b>${g.n}</b><div class="lcat">${g.cat}</div><div class="laddr">${g.a}</div><div class="lmeta">${g.hours?`<b>Hours:</b> ${g.hours}`:''}${g.rating?` &nbsp;·&nbsp; <b>Rating:</b> ${g.rating}`:''}</div><div class="lnote">${g.note}</div></div>`;}
+function initMap(){
+ const map=L.map('map',{scrollWheelZoom:true,zoomControl:true}).setView([41.886,-87.66],13);_map=map;
+ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',detectRetina:true,attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
+ map.on('click',closeSide);
+ const trunk=L.layerGroup().addTo(map);
+ L.polyline(TRAIN,{color:'#2b7de0',weight:3,opacity:.5}).addTo(trunk);
+ L.polyline([ELMHURST,MCMASTER],{color:'#c0392b',weight:2.5,dashArray:'3 7',opacity:.5}).addTo(trunk);
+ function bigPin(ll,color,label,sub){L.circleMarker(ll,{radius:9,color:'#fff',weight:2,fillColor:color,fillOpacity:1}).addTo(map).bindPopup(`<div class="lpop"><b>${label}</b><div class="lnote">${sub}</div></div>`).bindTooltip(label,{direction:'top',offset:[0,-6]});}
+ bigPin(OGILVIE,'#7b53b8','Ogilvie Transportation Center','Board the Metra UP‑W → Elmhurst (~26–39 min)');
+ bigPin(ELMHURST,'#2b7de0','Elmhurst Metra station','McMaster shuttle picks up here');
+ bigPin(MCMASTER,'#c0392b','McMaster-Carr (work)','600 N County Line Rd, Elmhurst');
+ const grocLayer=L.layerGroup().addTo(map);GROCERY.forEach((g,i)=>L.marker([g.lat,g.lng],{icon:makePlaceIcon('grocery'),riseOnHover:true,title:g.n,keyboard:true,bubblingMouseEvents:false}).addTo(grocLayer).bindTooltip(`${g.n}<br><span style="font-size:11px;color:#6b7280">Click for hours + cost</span>`,{direction:'top',offset:[0,-14]}).on('click',e=>{if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);openPlace('grocery',i);}));
+ const gymLayer=L.layerGroup().addTo(map);GYMS.forEach((g,i)=>L.marker([g.lat,g.lng],{icon:makePlaceIcon('gym'),riseOnHover:true,title:g.n,keyboard:true,bubblingMouseEvents:false}).addTo(gymLayer).bindTooltip(`${g.n}<br><span style="font-size:11px;color:#6b7280">Click for hours + cost</span>`,{direction:'top',offset:[0,-14]}).on('click',e=>{if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);openPlace('gym',i);}));
+ const aptLayer=L.layerGroup().addTo(map);
+ APTS.forEach(a=>{const m=L.marker([a.lat,a.lng],{icon:makePinIcon(a.id,'#24446f'),riseOnHover:true,bubblingMouseEvents:false}).addTo(aptLayer);m.bindPopup(popupHtml(a),{maxWidth:250});m.bindTooltip(`${a.id}. ${a.name}`,{direction:'top'});m.on('click',(e)=>{if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);openSide(a.id);});aptMarkers[a.id]=m;});
+ L.control.layers(null,{'Apartments':aptLayer,'Grocery':grocLayer,'Gyms':gymLayer,'Train + shuttle':trunk},{collapsed:false,position:'bottomleft'}).addTo(map);
+ _ALL=L.latLngBounds([...APTS.map(a=>[a.lat,a.lng]),OGILVIE,ELMHURST,MCMASTER]);
+ setTimeout(()=>{try{map.invalidateSize();zoomApts();}catch(e){console.warn(e);}},300);
+}
+function fitAll(){try{_map.invalidateSize();_map.fitBounds(_ALL.pad(.06));}catch(e){}}
+function zoomApts(){try{_map.invalidateSize();_map.fitBounds(L.latLngBounds([...APTS.map(a=>[a.lat,a.lng]),OGILVIE]).pad(.25),{animate:true});}catch(e){}}
+function setShareStatus(msg){const el=$('#sharestatus');if(el)el.textContent=msg;}
+function shareHtmlSource(){
+ const clone=document.documentElement.cloneNode(true);
+ const map=clone.querySelector('#map');if(map)map.innerHTML='';
+ const side=clone.querySelector('#side');if(side)side.classList.remove('open');
+ const sideContent=clone.querySelector('#sidecontent');if(sideContent)sideContent.innerHTML='';
+ const share=clone.querySelector('#shareoverlay');if(share){share.classList.remove('open');share.setAttribute('aria-hidden','true');}
+ const status=clone.querySelector('#sharestatus');if(status)status.textContent='';
+ const meta=clone.querySelector('#mapmeta');if(meta)meta.innerHTML='';
+ return '<!doctype html>\n'+clone.outerHTML;
+}
+function openShare(){const o=$('#shareoverlay');if(o){o.classList.add('open');o.setAttribute('aria-hidden','false');setShareStatus('');}}
+function closeShare(){const o=$('#shareoverlay');if(o){o.classList.remove('open');o.setAttribute('aria-hidden','true');}}
+function downloadShareCopy(){
+ const blob=new Blob([shareHtmlSource()],{type:'text/html;charset=utf-8'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');
+ a.href=url;
+ a.download='Fulton_Market_Apartment_Map_SHARE.html';
+ document.body.appendChild(a);
+ a.click();
+ a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ setShareStatus('Downloaded a share-ready HTML copy.');
+}
+async function copyText(text,ok){
+ try{await navigator.clipboard.writeText(text);setShareStatus(ok);}
+ catch(e){setShareStatus('Copy failed. You can still use the downloaded HTML file.');}
+}
+function shareMessage(){
+ return `I made an interactive Fulton / West Loop apartment commute map for the UP-W to Elmhurst. Open the attached HTML file in a browser, then click apartment, gym, and grocery pins for details. Internet is needed for the map tiles.`;
+}
+$('#fitall').onclick=fitAll;$('#zoomapts').onclick=zoomApts;
+$('#sharemap').onclick=openShare;
+$('#closeshare').onclick=closeShare;
+$('#downloadshare').onclick=downloadShareCopy;
+$('#copyshare').onclick=()=>copyText(shareMessage(),'Copied a sendable message.');
+$('#copyfiletip').onclick=()=>copyText('Fulton_Market_Apartment_Map_SHARE.html','Copied the file name.');
+$('#shareoverlay').onclick=e=>{if(e.target.id==='shareoverlay')closeShare();};
+$('#railtoggle').onclick=()=>{$('.app').classList.add('rail-hidden');$('#rail').classList.add('collapsed');$('#railopen').style.display='grid';setTimeout(()=>{if(_map)_map.invalidateSize();},150);};
+$('#railopen').onclick=()=>{$('.app').classList.remove('rail-hidden');$('#rail').classList.remove('collapsed');$('#railopen').style.display='none';setTimeout(()=>{if(_map)_map.invalidateSize();},150);};
+setMapMeta(`<b>${APTS.length} apartment finalists</b><br>Blue line = Metra UP-W. Dashed red = Elmhurst shuttle leg.`);
+try{ if(typeof L==='undefined') throw new Error('Leaflet did not load'); initMap(); }
+catch(err){ console.error('Map init failed:',err); var el=document.getElementById('map'); if(el) el.innerHTML='<div class="maperr"><b>The interactive map couldn\'t load</b> ('+err.message+').<br>All listing data is still in the table below — click a row to open its profile.</div>'; }
+</script>
+</body>
+</html>
